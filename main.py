@@ -74,11 +74,13 @@ if __name__ == "__main__":
     pdef = setup_pdef(panda_sim)
     goal = PackGoal1()
     pdef.set_goal(goal)
-
-    planner = rrt.KinodynamicRRT(pdef)
+    h = utils.make_sum_heuristic(goal)
+    p_val = 0.1
+    d_max = 10
+    planner = rrt.dhRRT(pdef, h, p_val, d_max)
     time_st = time.time()
-    solved, plan = planner.solve(600.0)
-    print("Running time of rrt.KinodynamicRRT.solve(): %f secs" % (time.time() - time_st))
+    solved, plan = planner.solve(1200.0)
+    print("Running time of rrt.dhRRT.solve(): %f secs" % (time.time() - time_st))
 
     if solved:
       print("The Plan has been Found:")

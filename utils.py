@@ -3,6 +3,7 @@ import pybullet as p
 import pybullet_data as pd
 import pybullet_utils.bullet_client as bc
 import sim
+from goal import PackGoal1
 '''
 Input: n, the number of boxes to generate
        x_bound, [lower, higher] the x bounds to place boxes 
@@ -39,14 +40,65 @@ def setup_env(panda_sim):
   panda_sim.add_object([0.02, 0.02, 0.02], [0.0, 0.0, 1.0, 1.0], [-0.05, 0.05])
   panda_sim.add_object([0.02, 0.02, 0.02], [0.0, 0.0, 1.0, 1.0], [0, 0.05])
   panda_sim.add_object([0.02, 0.02, 0.02], [0.0, 0.0, 1.0, 1.0], [0.05, 0.05])
+"""
+Generates a heuristic function for use in dhRRT
+Current approach: The sum of the distances of the boxes to the center of the goal region
 
+"""
+def make_heuristic(goal : PackGoal1):
+  n = goal.n_boxes
+  x_g = goal.x_g
+  y_g = goal.y_g
+
+  x_center = (x_g[0] + x_g[1]) / 2
+  y_center = (y_g[0] + y_g[1]) / 2
+  goal_center = [x_center, y_center]
+  def h(state):
+    stateVec = state["stateVec"]
+    
+    box_dists = np.zeros(shape=(n, ))
+    for i in range(n):
+        start_idx = -3*(i+1)
+        end_idx = start_idx+2
+        pos = stateVec[start_idx:end_idx]
+        box_loc = [pos[0], pos[1]]
+        box_dists[i] = np.linalg.norm(np.subtract(box_loc, goal_center))
+    
+
+
+    return np.sum(box_dists)
+
+  return h
+    
+def make_sum_heuristic(goal : PackGoal1):
+  # = min(dist from edge, 0 )
+  n = goal.n_boxes
+  x_g = goal.x_g
+  y_g = goal.y_g
+
+  x_center = (x_g[0] + x_g[1]) / 2
+  y_center = (y_g[0] + y_g[1]) / 2
+  goal_center = [x_center, y_center]
+  def h(state):
+    stateVec = state["stateVec"]
+    
+    box_dists = np.zeros(shape=(n, ))
+    for i in range(n):
+        start_idx = -3*(i+1)
+        end_idx = start_idx+2
+        pos = stateVec[start_idx:end_idx]
+        box_dist_x = min(x_g[0] - pos[0], 0)
+        box_dist_y = min(y_g[0] - pos[1], 0)
+        box_dists[i] = box_dist_x + box_dist_y
+    return np.sum(box_dists)
+  return h
 def setup_390env(panda_sim, n_boxes=3):
   # set up my research environment
   bin_color = [0.4, 0.4, 0.4, 1.0]
 
   # smaller than [-0.3, 0.3] to ensure nothing starts in a corner
-  x_bound = [-0.2, 0.25]
-  y_bound = [-0.2, 0.25]
+  x_bound = [0.05, 0.25]
+  y_bound = [0.05, 0.25]
   # vertical walls
   panda_sim.add_obstacle([0.3, 0.01, 0.1], bin_color, [0, 0.3], baseMass=0)
   panda_sim.add_obstacle([0.3, 0.01, 0.1], bin_color, [0, -0.3], baseMass=0)

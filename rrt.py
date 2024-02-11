@@ -18,6 +18,7 @@ class Tree(object):
         self.dim_state = self.pdef.get_state_dimension()
         self.nodes = []
         self.stateVecs = np.empty(shape=(0, self.dim_state))
+        self.latest = None
 
     def add(self, node):
         """
@@ -26,6 +27,7 @@ class Tree(object):
         self.nodes.append(node)
         self.stateVecs = np.vstack((self.stateVecs, node.state['stateVec']))
         assert len(self.nodes) == self.stateVecs.shape[0]
+        self.latest = node
 
     def nearest(self, rstateVec):
         """
@@ -40,6 +42,28 @@ class Tree(object):
         Query the size (number of nodes) of the tree. 
         """
         return len(self.nodes)
+    
+    def depth(self):
+        
+        max_depth = 0
+
+        for node in self.nodes:
+            curr_depth = node.compute_depth()
+            if curr_depth > max_depth:
+                max_depth = curr_depth
+        print("Depth was found to be: ", max_depth)
+        if (len(self.nodes) > 1) and (max_depth == 0):
+            print("Tree depth not working")
+        return max_depth
+    
+    def get_leaves(self):
+        leaves = set(self.nodes)
+
+        for node in self.nodes:
+            if node.get_parent() in leaves:
+                leaves.remove(node.get_parent())
+        
+        return leaves
     
 
 class Node(object):
@@ -56,7 +80,17 @@ class Node(object):
         self.state = state
         self.control = None # the control asscoiated with this node
         self.parent = None # the parent node of this node
+    
+    def compute_depth(self):
+        depth = 0
+        curr = self.get_parent()
+        if curr == None:
+            return 0
+        while curr.get_parent() != None:
+            depth += 1
+            curr = curr.get_parent()
 
+        return depth + 1
     def get_control(self):
         return self.control
 
@@ -68,6 +102,9 @@ class Node(object):
 
     def set_parent(self, pnode):
         self.parent = pnode
+    
+    def get_state(self):
+        return self.state
     
 
 class KinodynamicRRT(object):
@@ -153,11 +190,26 @@ class dhRRT(object):
             d_max, the tree limit  
     Output: Technically none, results in tau (sequence of controls) being executed
     """
-    def __init__(self, pdef):
+    def __init__(self, pdef, h, p, d_max):
         self.pdef = pdef
         self.tree = Tree(pdef)
         self.state_sampler = samplers.StateSampler(self.pdef) # state sampler
         self.control_sampler = samplers.ControlSampler(self.pdef) # control sampler
+        self.h = h
+        self.p = p
+        self.d_max = d_max
+    """
+    Gets the motions to achieve this node 
+    in other words, get all parents
+    """
+    def extract_controls(self, node : Node):
+        motions = [] # a list of parent nodes
+        curr_node = node
+        while curr_node != None:
+            motions.insert(0, curr_node)
+            curr_node = curr_node.get_parent()
+
+        return motions
 
     """
     Expands the current motion tree
@@ -168,15 +220,21 @@ class dhRRT(object):
     """
     def expand_tree(self, tree):
         # Hyperparams
-        m = 10
+        m = 5
 
         # sample random state
         q_rand = self.state_sampler.sample()
         q_near = self.tree.nearest(q_rand)
 
-        q_new, v_star = self.control_sampler.sample_to(q_near, q_rand, k=m)
+        near_control, near_state = self.control_sampler.sample_to(q_near, q_rand, k=m)
+        if not (near_control is None):
+            new_node = Node(near_state)
+            new_node.set_control(near_control)
+            new_node.set_parent(q_near)
+            tree.add(new_node)
+        # ensure that v_star can be translated to a valid motion
 
-        return
+        return tree
     
     """
     Input: tree, current motion tree
@@ -185,9 +243,28 @@ class dhRRT(object):
                        p, progress threshold
                        d_max, tree size limit
     """
-    def evaluate_progress(self, tree):
+    def evaluate_progress(self, tree : Tree):
+        q_new = self.tree.latest
+        tau = []
+        if self.pdef.goal.is_satisfied(q_new.get_state()):
+            tau = self.extract_controls(q_new)
+        elif (self.h(tree.nodes[0].get_state()) - self.h(q_new.get_state())) > self.p:
+            tau = self.extract_controls(q_new)
+        elif (tree.depth() == self.d_max):
+            print("Max depth reached")
+            leaves = list(tree.get_leaves())
+            min_h = np.infty
+            min_leaf = None
+            for leaf in leaves:
+                curr_h = self.h(leaf.get_state())
+                if curr_h < min_h:
+                    print("Found a min leaf")
+                    min_h = curr_h
+                    min_leaf = leaf
+            tau = self.extract_controls(min_leaf)
 
-        return
+        
+        return tau
     """
     The dhRRT algorithm 
     
@@ -196,12 +273,39 @@ class dhRRT(object):
     def solve(self, time_budget):
         # Initialize Tree
         start_node = Node(self.pdef.start_state)
+        sim = self.pdef.panda_sim
         start_node.set_parent(None)
         self.tree.add(start_node)
 
         tau = []
         t_s = time.time()
-        while ((time.time() - t_s) > time_budget):
+        deep_plan = []
+        plan = []
+        solved = False
+        while ((time.time() - t_s) < time_budget):
             self.tree = self.expand_tree(self.tree)
-        return
+            print("Expanded tree")
+            tau = self.evaluate_progress(self.tree)
+            print("Tau from latest evalutation: ", tau)
+            if (tau != []):
+                deep_plan.append(tau)
+                print("Found a tau: ", tau)
+                utils.execute_plan(sim, tau)
+                q_star = sim.save_state()
+                if self.pdef.get_goal().is_satisfied(q_star):
+                    solved = True
+                    break
+                self.tree = Tree(self.pdef)
+                new_start = Node(q_star)
+                new_start.set_parent(None)
+                new_start.set_control(np.zeros(shape=(6, )))
+                self.tree.add(new_start)
+                tau = []
+                q_star = None
+        if solved:
+            # flatten plan
+            for arr in deep_plan:
+                for element in arr:
+                    plan.append(element)
+        return solved, plan
     

@@ -23,7 +23,7 @@ class PackGoal1(Goal):
     Represented as a rectangular region
     """
 
-    def __init__(self, x_g = [0.12, 0.28], y_g = [0.12, 0.28], n_boxes = 3):
+    def __init__(self, x_g = [0.14, 0.28], y_g = [0.14, 0.28], n_boxes = 3):
         super(PackGoal1, self).__init__()
     
         self.x_g, self.y_g, self.n_boxes = x_g, y_g, n_boxes
