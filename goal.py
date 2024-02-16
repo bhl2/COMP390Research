@@ -1,7 +1,7 @@
 import numpy as np
 import jac
 import pybullet as p
-
+from utils import find_packing
 class Goal(object):
     """
     A trivial goal that is always satisfied.
@@ -46,6 +46,32 @@ class PackGoal1(Goal):
         
         return True
 
+class PackGoal2(Goal):
+    def __init__(self, n_boxes, x_corner, x_dir, y_corner, y_dir, box_width):
+        super(PackGoal2, self).__init__()
+
+        # Compute best way to fit in corner
+        self.optim_packing = find_packing(n_boxes, x_corner, x_dir, y_corner, y_dir, box_width)
+        self.optim_center = np.average(self.optim_packing, axis=0)
+        self.n_boxes = n_boxes
+    def is_satisfied(self, state):
+        stateVec = state["stateVec"]
+        box_pos_lst = np.zeros(shape=(self.n_boxes, 2))
+        for i in range(self.n_boxes):
+            start_idx = -3*(i+1)
+            end_idx = start_idx+2
+            pos = stateVec[start_idx:end_idx]
+            x_pos, y_pos = pos[0], pos[1]
+            box_pos_lst[i, 0] = x_pos
+            box_pos_lst[i, 1] = y_pos
+        
+        box_pos_avg = np.average(box_pos_lst, axis=0)
+        if abs(np.linalg.norm(box_pos_avg - self.optim_center)) < 0.02:
+            return True
+        else:
+            return False
+    
+    
 
 
 class RelocateGoal(Goal):

@@ -6,7 +6,7 @@ import pybullet_utils.bullet_client as bc
 import numpy as np
 import sim
 from pdef import Bounds, ProblemDefinition
-from goal import RelocateGoal, GraspGoal, PackGoal1
+from goal import RelocateGoal, GraspGoal, PackGoal1, PackGoal2
 import rrt
 import utils
 import opt
@@ -72,6 +72,7 @@ if __name__ == "__main__":
   elif args.task == 5:
     utils.setup_390env(panda_sim)
     pdef = setup_pdef(panda_sim)
+    pdef.bounds_ctrl[3] = 1
     goal = PackGoal1()
     pdef.set_goal(goal)
     h = utils.make_sum_heuristic(goal)
@@ -80,8 +81,18 @@ if __name__ == "__main__":
     planner = rrt.dhRRT(pdef, h, p_val, d_max)
     time_st = time.time()
     solved, plan = planner.solve(1200.0)
-    print("Running time of rrt.dhRRT.solve(): %f secs" % (time.time() - time_st))
+    print("Running time of rrt.dhRRT.solve() for P1 : %f secs" % (time.time() - time_st))
 
+
+    # Finish second step
+    pdef2 = setup_pdef(panda_sim)
+    goal = PackGoal2()
+    pdef2.set_goal(goal)
+    p_val = 0.1
+    d_max = 10
+    planner = rrt.dhRRT(pdef, h, p_val, d_max)
+    time_st = time.time()
+    solved, plan = planner.solve(1200.0)
     if solved:
       print("The Plan has been Found:")
       panda_sim.restore_state(pdef.get_start_state())

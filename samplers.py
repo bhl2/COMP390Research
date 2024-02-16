@@ -79,4 +79,10 @@ class ControlSampler(object):
             best_i = np.argmin(dists)
             bctrl, ostate = controls[best_i], pstates[best_i]
         return bctrl, ostate
+    
+    def set_max_duration(self, d):
+        self.high[3] = d
+    
+    def set_min_duration(self, d):
+        self.low[3] = d
         

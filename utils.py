@@ -3,7 +3,7 @@ import pybullet as p
 import pybullet_data as pd
 import pybullet_utils.bullet_client as bc
 import sim
-from goal import PackGoal1
+from goal import PackGoal1, PackGoal2
 '''
 Input: n, the number of boxes to generate
        x_bound, [lower, higher] the x bounds to place boxes 
@@ -92,6 +92,42 @@ def make_sum_heuristic(goal : PackGoal1):
         box_dists[i] = box_dist_x + box_dist_y
     return np.sum(box_dists)
   return h
+
+def make_center_heuristic(goal : PackGoal2):
+  n = goal.n_boxes
+  return
+'''
+Returns the coordinates of each box to make the tighest packed configuration
+Inputs:
+n_boxes - How many boxes to fit in the corner
+x_corner - The x coordinate of the corner
+x_dir - -1 if going positive would hit wall and 1 otherwise
+y_corner - the y coordinate of the corner
+y_dir - -1 if going positive would hit wall and 1 otherwise
+box_width - how big each box is, the half extent
+'''
+def find_packing(n_boxes, x_corner, x_dir, y_corner, y_dir, box_width):
+
+  coords = []
+  # find closest square to find width 
+  width = 0
+  for w in range(n_boxes+1):
+    if w ** 2 >= n_boxes:
+      width = w
+      break
+  
+  not_full = True
+  while (not_full):
+    for i in range(width):
+      for j in range(width):
+        new_x = x_corner + x_dir * (((i*2) + 1) * box_width)
+        new_y = y_corner + y_dir * (((j*2) + 1) * box_width)
+        coords.append([new_x, new_y])
+        if (len(coords) == n_boxes):
+          return coords
+  
+
+  return coords
 def setup_390env(panda_sim, n_boxes=3):
   # set up my research environment
   bin_color = [0.4, 0.4, 0.4, 1.0]
@@ -112,6 +148,9 @@ def setup_390env(panda_sim, n_boxes=3):
 
   # hard code test for goal
   # box_pos_lst = [[0.12, 0.2], [0.21, 0.15], [0.23, 0.23]]
+
+  # testing optimal packing 
+  # box_pos_lst = find_packing(3, 0.3, -1, 0.3, -1, 0.02)
   # print("Box positions: ", box_pos_lst)
   for pos in box_pos_lst:
     panda_sim.add_object([0.02, 0.02, 0.02], [0.0, 0.0, 1.0, 1.0], pos)
