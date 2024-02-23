@@ -108,9 +108,9 @@ class ProblemDefinition(object):
         pos, _ = self.panda_sim.jac_solver.forward_kinematics(joint_vals)
         x, y = pos[0]-0.4, pos[1]-0.2 # relative to world not base
         # Note: the robot base is placed at [-0.4, -0.2, 0] with zero orientation in the world frame
-        if (abs(x) > 0.35):
+        if (abs(x) > 0.3):
             return False
-        if (abs(y) > 0.35):
+        if (abs(y) > 0.3):
             return False
         
         return True

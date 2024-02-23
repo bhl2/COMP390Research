@@ -1,7 +1,39 @@
 import numpy as np
 import jac
 import pybullet as p
-from utils import find_packing
+
+'''
+Returns the coordinates of each box to make the tighest packed configuration
+Inputs:
+n_boxes - How many boxes to fit in the corner
+x_corner - The x coordinate of the corner
+x_dir - -1 if going positive would hit wall and 1 otherwise
+y_corner - the y coordinate of the corner
+y_dir - -1 if going positive would hit wall and 1 otherwise
+box_width - how big each box is, the half extent
+'''
+def find_packing(n_boxes, x_corner, x_dir, y_corner, y_dir, box_width):
+
+  coords = []
+  # find closest square to find width 
+  width = 0
+  for w in range(n_boxes+1):
+    if w ** 2 >= n_boxes:
+      width = w
+      break
+  
+  not_full = True
+  while (not_full):
+    for i in range(width):
+      for j in range(width):
+        new_x = x_corner + x_dir * (((i*2) + 1) * box_width)
+        new_y = y_corner + y_dir * (((j*2) + 1) * box_width)
+        coords.append([new_x, new_y])
+        if (len(coords) == n_boxes):
+          return coords
+  
+
+  return coords
 class Goal(object):
     """
     A trivial goal that is always satisfied.
@@ -23,7 +55,7 @@ class PackGoal1(Goal):
     Represented as a rectangular region
     """
 
-    def __init__(self, x_g = [0.14, 0.28], y_g = [0.14, 0.28], n_boxes = 3):
+    def __init__(self, x_g = [0.12, 0.281], y_g = [0.12, 0.281], n_boxes = 3):
         super(PackGoal1, self).__init__()
     
         self.x_g, self.y_g, self.n_boxes = x_g, y_g, n_boxes
@@ -36,10 +68,10 @@ class PackGoal1(Goal):
             end_idx = start_idx+2
             pos = stateVec[start_idx:end_idx]
             x_pos, y_pos = pos[0], pos[1]
-            
+            #print("Box pos:", pos)
             # does not account for cube size
-            x_bound = x_pos > self.x_g[0] and x_pos < self.x_g[1]
-            y_bound = y_pos > self.y_g[0] and y_pos < self.y_g[1]
+            x_bound = x_pos >= self.x_g[0] and x_pos <= self.x_g[1]
+            y_bound = y_pos >= self.y_g[0] and y_pos <= self.y_g[1]
 
             if not (x_bound and y_bound):
                 return False

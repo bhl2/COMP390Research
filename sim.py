@@ -212,8 +212,8 @@ class PandaSim(object):
                                                    self.bullet_client.VELOCITY_CONTROL,
                                                    targetVelocities=vq)
       self.step()
-
-      if (i + 1) % 12 == 0: # check for every 0.2 second
+      # CHANGE: Used to be % 12 (0.2 sec), now % 3 (0.05 sec)
+      if (i + 1) % 3 == 0: # check for every 0.2 second
         if not self.pdef.is_state_valid(self.save_state()):
           valid = False
           break

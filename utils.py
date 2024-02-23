@@ -1,9 +1,10 @@
+import math
 import numpy as np
 import pybullet as p
 import pybullet_data as pd
 import pybullet_utils.bullet_client as bc
 import sim
-from goal import PackGoal1, PackGoal2
+from goal import PackGoal1, PackGoal2, find_packing
 '''
 Input: n, the number of boxes to generate
        x_bound, [lower, higher] the x bounds to place boxes 
@@ -82,84 +83,74 @@ def make_sum_heuristic(goal : PackGoal1):
   def h(state):
     stateVec = state["stateVec"]
     
-    box_dists = np.zeros(shape=(n, ))
+    box_dists = np.zeros(shape=(n,))
     for i in range(n):
         start_idx = -3*(i+1)
         end_idx = start_idx+2
         pos = stateVec[start_idx:end_idx]
-        box_dist_x = min(x_g[0] - pos[0], 0)
-        box_dist_y = min(y_g[0] - pos[1], 0)
-        box_dists[i] = box_dist_x + box_dist_y
-    return np.sum(box_dists)
+        box_dist_x = x_g[1] - pos[0]
+        box_dist_y = y_g[1] - pos[1]
+        box_dists[i] = math.sqrt((box_dist_x ** 2) + (box_dist_y ** 2))
+    return abs(np.sum(box_dists))
   return h
 
 def make_center_heuristic(goal : PackGoal2):
   n = goal.n_boxes
-  return
-'''
-Returns the coordinates of each box to make the tighest packed configuration
-Inputs:
-n_boxes - How many boxes to fit in the corner
-x_corner - The x coordinate of the corner
-x_dir - -1 if going positive would hit wall and 1 otherwise
-y_corner - the y coordinate of the corner
-y_dir - -1 if going positive would hit wall and 1 otherwise
-box_width - how big each box is, the half extent
-'''
-def find_packing(n_boxes, x_corner, x_dir, y_corner, y_dir, box_width):
 
-  coords = []
-  # find closest square to find width 
-  width = 0
-  for w in range(n_boxes+1):
-    if w ** 2 >= n_boxes:
-      width = w
-      break
-  
-  not_full = True
-  while (not_full):
-    for i in range(width):
-      for j in range(width):
-        new_x = x_corner + x_dir * (((i*2) + 1) * box_width)
-        new_y = y_corner + y_dir * (((j*2) + 1) * box_width)
-        coords.append([new_x, new_y])
-        if (len(coords) == n_boxes):
-          return coords
-  
+  def h(state):
+    stateVec = state["stateVec"]
+    
+    box_pos_lst = np.zeros(shape=(n, 2))
+    for i in range(n):
+      start_idx = -3*(i+1)
+      end_idx = start_idx+2
+      pos = stateVec[start_idx:end_idx]
+      box_pos_lst[i, 0] = pos[0]
+      box_pos_lst[i, 1] = pos[1]
+    box_center = np.average(box_pos_lst, axis=0)
+    return abs(np.linalg.norm(box_center - goal.optim_center))
+  return h
 
-  return coords
 def setup_390env(panda_sim, n_boxes=3):
   # set up my research environment
   bin_color = [0.4, 0.4, 0.4, 1.0]
 
   # smaller than [-0.3, 0.3] to ensure nothing starts in a corner
-  x_bound = [0.05, 0.25]
-  y_bound = [0.05, 0.25]
+  x_bound = [0, 0.25]
+  y_bound = [0, 0.25]
   # vertical walls
-  panda_sim.add_obstacle([0.3, 0.01, 0.1], bin_color, [0, 0.3], baseMass=0)
-  panda_sim.add_obstacle([0.3, 0.01, 0.1], bin_color, [0, -0.3], baseMass=0)
+  panda_sim.add_obstacle([0.3, 0.01, 0.1], bin_color, [0, 0.31], baseMass=0)
+  panda_sim.add_obstacle([0.3, 0.01, 0.1], bin_color, [0, -0.31], baseMass=0)
 
   # horizontal walls
-  panda_sim.add_obstacle([0.01, 0.3, 0.1], bin_color, [0.3, 0], baseMass=0)
-  panda_sim.add_obstacle([0.01, 0.3, 0.1], bin_color, [-0.3, 0], baseMass=0)
+  panda_sim.add_obstacle([0.01, 0.3, 0.1], bin_color, [0.31, 0], baseMass=0)
+  panda_sim.add_obstacle([0.01, 0.3, 0.1], bin_color, [-0.31, 0], baseMass=0)
 
   # make some boxes and place them randomly!
   box_pos_lst = pos_n_boxes(n_boxes, x_bound, y_bound)
 
   # hard code test for goal
-  # box_pos_lst = [[0.12, 0.2], [0.21, 0.15], [0.23, 0.23]]
+  # box_pos_lst = [[0.15, 0.2], [0.21, 0.15], [0.23, 0.23]]
 
   # testing optimal packing 
-  # box_pos_lst = find_packing(3, 0.3, -1, 0.3, -1, 0.02)
+  #box_pos_lst = find_packing(3, 0.3, -1, 0.3, -1, 0.02)
   # print("Box positions: ", box_pos_lst)
   for pos in box_pos_lst:
     panda_sim.add_object([0.02, 0.02, 0.02], [0.0, 0.0, 1.0, 1.0], pos)
   
 
   return
+
+def go_to_place(panda_sim, x, y):
+  curr_ee, _ = panda_sim.get_ee_pose()
+  ee_x, ee_y = curr_ee[0]-0.4, curr_ee[1]-0.2
+  vx = x - ee_x
+  vy = y - ee_y
+  ctrl = [vx, vy, 0, 0.2]
+  _ = panda_sim.execute(ctrl)
 def execute_plan(panda_sim, plan, sleep_time=0.005):
   for node in plan:
-    #panda_sim.restore_state(node.state)
+    panda_sim.restore_state(node.state)
     p_from, _ = panda_sim.get_ee_pose()
     ctrl = node.get_control()
     if ctrl is not None:

@@ -51,7 +51,7 @@ class Tree(object):
             curr_depth = node.compute_depth()
             if curr_depth > max_depth:
                 max_depth = curr_depth
-        print("Depth was found to be: ", max_depth)
+        #print("Depth was found to be: ", max_depth)
         if (len(self.nodes) > 1) and (max_depth == 0):
             print("Tree depth not working")
         return max_depth
@@ -78,7 +78,7 @@ class Node(object):
                                   "stateVec": numpy.ndarray}
         """
         self.state = state
-        self.control = None # the control asscoiated with this node
+        self.control = np.zeros(shape=(4,)) # the control asscoiated with this node
         self.parent = None # the parent node of this node
     
     def compute_depth(self):
@@ -99,6 +99,7 @@ class Node(object):
 
     def set_control(self, control):
         self.control = control
+        # print(control)
 
     def set_parent(self, pnode):
         self.parent = pnode
@@ -210,6 +211,14 @@ class dhRRT(object):
             curr_node = curr_node.get_parent()
 
         return motions
+    
+    def execute_tau(self, tau):
+        
+        for motion in tau:
+            print(motion.get_control())
+            self.sim.execute(motion.get_control())
+        
+        print("Executed a tau")
 
     """
     Expands the current motion tree
@@ -249,6 +258,7 @@ class dhRRT(object):
         if self.pdef.goal.is_satisfied(q_new.get_state()):
             tau = self.extract_controls(q_new)
         elif (self.h(tree.nodes[0].get_state()) - self.h(q_new.get_state())) > self.p:
+            print("Acting based on progress")
             tau = self.extract_controls(q_new)
         elif (tree.depth() == self.d_max):
             print("Max depth reached")
@@ -274,6 +284,7 @@ class dhRRT(object):
         # Initialize Tree
         start_node = Node(self.pdef.start_state)
         sim = self.pdef.panda_sim
+        self.sim = sim
         start_node.set_parent(None)
         self.tree.add(start_node)
 
@@ -284,13 +295,14 @@ class dhRRT(object):
         solved = False
         while ((time.time() - t_s) < time_budget):
             self.tree = self.expand_tree(self.tree)
-            print("Expanded tree")
+            #print("Expanded tree")
             tau = self.evaluate_progress(self.tree)
-            print("Tau from latest evalutation: ", tau)
+            #print("Tau from latest evalutation: ", tau)
             if (tau != []):
                 deep_plan.append(tau)
-                print("Found a tau: ", tau)
+                #print("Found a tau: ", tau)
                 utils.execute_plan(sim, tau)
+                # self.execute_tau(tau)
                 q_star = sim.save_state()
                 if self.pdef.get_goal().is_satisfied(q_star):
                     solved = True
@@ -298,14 +310,16 @@ class dhRRT(object):
                 self.tree = Tree(self.pdef)
                 new_start = Node(q_star)
                 new_start.set_parent(None)
-                new_start.set_control(np.zeros(shape=(6, )))
+                new_start.set_control(np.zeros(shape=(4, )))
                 self.tree.add(new_start)
+                self.pdef.set_start_state(q_star)
                 tau = []
-                q_star = None
+                # q_star = None
         if solved:
             # flatten plan
             for arr in deep_plan:
                 for element in arr:
                     plan.append(element)
-        return solved, plan
+        end = sim.save_state()
+        return solved, plan, end
     

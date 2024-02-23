@@ -72,36 +72,34 @@ if __name__ == "__main__":
   elif args.task == 5:
     utils.setup_390env(panda_sim)
     pdef = setup_pdef(panda_sim)
-    pdef.bounds_ctrl[3] = 1
+    pdef.bounds_ctrl.set_bounds(3, 1, 3)
     goal = PackGoal1()
     pdef.set_goal(goal)
     h = utils.make_sum_heuristic(goal)
-    p_val = 0.1
-    d_max = 10
+    p_val = 0.01
+    d_max = 12
     planner = rrt.dhRRT(pdef, h, p_val, d_max)
     time_st = time.time()
-    solved, plan = planner.solve(1200.0)
+    solved, plan, end = planner.solve(1200.0)
     print("Running time of rrt.dhRRT.solve() for P1 : %f secs" % (time.time() - time_st))
-
-
-    # Finish second step
+    print("Done with part 1 Woo!")
+    panda_sim.restore_state(end)
     pdef2 = setup_pdef(panda_sim)
-    goal = PackGoal2()
+    utils.go_to_place(panda_sim, 0.01, 0.01) 
+    curr_state = panda_sim.save_state()
+    pdef2.set_start_state(curr_state)
+    print("About to start second step")
+    # Finish second step
+    time.sleep(1)
+    goal = PackGoal2(3, 0.3, -1, 0.3, -1, 0.02)
     pdef2.set_goal(goal)
-    p_val = 0.1
+    pdef2.bounds_ctrl.set_bounds(3, 1, 2)
+    h2 = utils.make_center_heuristic(goal)
+    p_val = 0.00001
     d_max = 10
-    planner = rrt.dhRRT(pdef, h, p_val, d_max)
+    planner = rrt.dhRRT(pdef2, h2, p_val, d_max)
     time_st = time.time()
     solved, plan = planner.solve(1200.0)
-    if solved:
-      print("The Plan has been Found:")
-      panda_sim.restore_state(pdef.get_start_state())
-      for _ in range(2):
-        panda_sim.step()
-      panda_sim.restore_state(pdef.get_start_state())
-      utils.execute_plan(panda_sim, plan)
-      while True:
-        pass
     # stateFull = panda_sim.save_state()
     # state = stateFull["stateVec"]
     # print("Should be last box:", state[-3:-1])
