@@ -4,7 +4,6 @@ import pybullet as p
 import pybullet_data as pd
 import pybullet_utils.bullet_client as bc
 import scipy
-import PyKDL
 class JacSolver(object):
     """
     The Jacobian solver for the 7-DoF Franka Panda robot.

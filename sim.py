@@ -19,9 +19,12 @@ pandaJointRange = np.array([[-2.8973, 2.8973],
                             [-0.0175, 3.7525],
                             [-2.8973, 2.8973]]) # the range of the robot's joint angles
 
-pandaStartJoints = [0.3360771289431801, 0.33773759795964864, 0.4331145290389591,
-                    -2.726785252069466, -0.9315032963941317, 2.962324195138054,
-                    2.46586065658275] # start joint angles of the robot
+# pandaStartJoints = [0.3360771289431801, 0.33773759795964864, 0.4331145290389591,
+#                     -2.726785252069466, -0.9315032963941317, 2.962324195138054,
+#                     2.46586065658275] # start joint angles of the robot
+
+pandaStartJoints = [0.26190429284418065, -0.5810563287655276, 0.7782012656001908, -2.7792496275070055, 
+                    0.5334985709807144, 2.2695743643150834, 1.3797705354443341]
 
 SimTimeStep = 1./60. # the time step of the simulator
 
@@ -52,7 +55,8 @@ class PandaSim(object):
     self.bullet_client.createMultiBody(baseMass=0, baseVisualShapeIndex=visGoalID, basePosition=[0.2, 0.2, 0])
 
     # setup the Panda robot arm
-    self.panda = self.bullet_client.loadURDF("franka_panda/panda.urdf", [-0.4, -0.2, 0.0], [0, 0, 0, 1], useFixedBase=True, flags=flags)
+    # self.panda = self.bullet_client.loadURDF("franka_panda/panda.urdf", [-0.4, -0.2, 0.0], [0, 0, 0, 1], useFixedBase=True, flags=flags)
+    self.panda = self.bullet_client.loadURDF("urdf/panda_stick.urdf", [-0.4, -0.2, 0.0], [0, 0, 0, 1], useFixedBase=True, flags=flags)
     self.pandaNumJoints = self.bullet_client.getNumJoints(self.panda)
     self.bullet_client.resetJointState(self.panda, pandaFingerJoint1Index, 0.04)
     self.bullet_client.resetJointState(self.panda, pandaFingerJoint2Index, 0.04)
@@ -225,6 +229,48 @@ class PandaSim(object):
       time.sleep(sleep_time)
     return wpts, valid
 
+  def execute_lift(self, height, sleep_time = 0.0):
+    valid = True
+    wpts = np.empty(shape=(0, 3))
+    # d = ctrl[3] # duration
+    vx = np.array([0, 0, height, 0, 0, 0]) # desired twist of the end-effector
+    
+    n_steps = int(1 / SimTimeStep)
+    # print("n_steps = ", n_steps)
+    #n_steps = 60
+    for i in range(n_steps):
+
+      ########## TODO ##########
+      J = np.zeros(shape=(6, 7)) # Jacobian matrix
+      vq = np.zeros(shape=(7,)) # joint velocities
+      j_vals, _, _ = self.get_joint_states()
+      J = self.get_jacobian_matrix(j_vals)
+      J_inv = np.linalg.pinv(J) # use pseudo inverse 
+      vq = np.matmul(J_inv, vx)
+      ##########################
+
+      if not self.pdef.is_state_high_quality(J):
+        valid = False
+        break
+
+      self.bullet_client.setJointMotorControlArray(self.panda,
+                                                   range(pandaNumDofs),
+                                                   self.bullet_client.VELOCITY_CONTROL,
+                                                   targetVelocities=vq)
+      self.step()
+      # CHANGE: Used to be % 12 (0.2 sec), now % 3 (0.05 sec)
+      if (i + 1) % 3 == 0: # check for every 0.2 second
+        if not self.pdef.is_state_valid(self.save_state()):
+          valid = False
+          break
+
+      pos_ee, quat_ee = self.get_ee_pose()
+      euler_ee = self.bullet_client.getEulerFromQuaternion(quat_ee)
+      wpt = np.array([pos_ee[0], pos_ee[1], euler_ee[2] % (2 * np.pi)])
+      wpts = np.vstack((wpts, wpt.reshape(1, -1)))
+      time.sleep(sleep_time)
+    return wpts, valid
+  
   def get_joint_states(self):
     """
     Get state of all joints."

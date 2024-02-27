@@ -85,4 +85,19 @@ class ControlSampler(object):
     
     def set_min_duration(self, d):
         self.low[3] = d
-        
+
+
+class TwoStepControlSampler(object):
+    """
+    Performs an upward motion, then lands at a box and pushes it 
+    """
+    def __init__(self, pdef):
+        self.pdef = pdef
+        pass
+
+    def sample_to(self, nnode, rstateVec, k):
+        pass
+    
+    def sample_two_step(self):
+        # find a box 
+        return

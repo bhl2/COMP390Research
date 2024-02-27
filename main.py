@@ -40,7 +40,7 @@ def setup_pdef(panda_sim):
 if __name__ == "__main__":
 
   parser = argparse.ArgumentParser()
-  parser.add_argument("--task", type=int, choices=[1, 2, 3, 4, 5])
+  parser.add_argument("--task", type=int, choices=[1, 2, 3, 4, 5, 6, 7])
   args = parser.parse_args()
 
   # set up the simulation
@@ -66,9 +66,70 @@ if __name__ == "__main__":
         print("Position: %f meters\t Orientation: %f rads" % (err_pos, err_orn))
         errs.append([err_pos, err_orn])
     errs = np.array(errs)
-    print("\nThe average Cartesian error for the entire exeution:")
+    print("\nThe average Cartesian error for the entire execution:")
     print("Position: %f meters\t Orientation: %f rads" % (errs[:, 0].mean(), errs[:, 1].mean()))
+  
+  # Testing Custom Controls 
+  elif args.task == 6:
+    pdef = setup_pdef(panda_sim)
+    start_state = panda_sim.save_state()
+    start_xy = np.array([-0.19959354, 0.09872576])
 
+    # Test lifting to a point
+    test_heights = [0.1, 0.2, 0.3]
+    for test_height in test_heights:
+      panda_sim.restore_state(start_state)
+      ee_before, _ = panda_sim.get_ee_pose()
+      before_xy = np.array([ee_before[0], ee_before[1]])
+      print("Start x, y: ", before_xy)
+      before_z = ee_before[2]
+      panda_sim.execute_lift(test_height)
+      ee_after, _ = panda_sim.get_ee_pose()
+      after_xy = np.array([ee_after[0], ee_after[1]])
+      after_z = ee_after[2]
+      z_err = (after_z - before_z) - test_height
+      flat_dist = np.linalg.norm(after_xy-before_xy)
+      print("Flat Dist Moved: ", flat_dist)
+      print("Height Moved: ", (after_z - before_z))
+      print("Error: ", z_err)
+      print("Percent Error: ", ((z_err/test_height) * 100))
+      time.sleep(1)
+    print("----------- Done Testing Vertical Lift --------")
+
+    # Test lifting, then moving to a point in the air
+    panda_sim.restore_state(start_state)
+    panda_sim.execute_lift(0.1)
+    ee_before, _ = panda_sim.get_ee_pose()
+    print("Before: ", ee_before)
+    end_xy = np.array([0.2, 0.2])
+    v_xy = end_xy - start_xy
+    ctrl = [v_xy[0], v_xy[1], 0, 1]
+    panda_sim.execute(ctrl)
+    ee_after, _ = panda_sim.get_ee_pose()
+    panda_sim.execute_lift(-0.1)
+
+    print("After: ", ee_after)
+    time.sleep(1)
+  # end if
+    
+  # Testing Custom Controls 
+  elif args.task == 7:
+    pdef = setup_pdef(panda_sim)
+    start_state = panda_sim.save_state()
+    start_xy = np.array([-0.19959354, 0.09872576])
+
+    # Test lifting to a point
+    height = 0.2
+    start_j_vals, _, _ = panda_sim.get_joint_states()
+
+    panda_sim.execute_lift(height)
+
+    end_j_vals, _, _ = panda_sim.get_joint_states()
+    print("Start joint vals: ", start_j_vals)
+
+    print("End joint vals: ", end_j_vals)
+    time.sleep(1)
+  # end if
   elif args.task == 5:
     utils.setup_390env(panda_sim)
     pdef = setup_pdef(panda_sim)
