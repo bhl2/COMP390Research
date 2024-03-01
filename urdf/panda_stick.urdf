@@ -265,7 +265,7 @@
 		<visual>
 			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
 			<geometry>
-				<box size="0.20000 0.01000 0.05000"/>
+				<box size="0.30000 0.01000 0.05000"/>
 			</geometry>
 			<material name="mat_-1_0">
 				<color rgba="1.00000 1.00000 1.00000 1.00000" />
@@ -274,7 +274,7 @@
 		<collision>
 			<origin rpy="0.00000 -0.00000 0.00000" xyz="0.00000 0.00000 0.00000"/>
 			<geometry>
-				<box size="0.01000 0.01000 0.20000"/>
+				<box size="0.30000 0.01000 0.050000"/>
 			</geometry>
 		</collision>
 	</link>

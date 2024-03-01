@@ -122,7 +122,7 @@ if __name__ == "__main__":
     height = 0.2
     start_j_vals, _, _ = panda_sim.get_joint_states()
 
-    panda_sim.execute_lift(height)
+    panda_sim.execute_lift(0.05)
 
     end_j_vals, _, _ = panda_sim.get_joint_states()
     print("Start joint vals: ", start_j_vals)
@@ -131,9 +131,11 @@ if __name__ == "__main__":
     time.sleep(1)
   # end if
   elif args.task == 5:
+    
     utils.setup_390env(panda_sim)
     pdef = setup_pdef(panda_sim)
     pdef.bounds_ctrl.set_bounds(3, 1, 3)
+    panda_sim.execute_lift(-0.2)
     goal = PackGoal1()
     pdef.set_goal(goal)
     h = utils.make_sum_heuristic(goal)

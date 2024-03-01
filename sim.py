@@ -23,8 +23,13 @@ pandaJointRange = np.array([[-2.8973, 2.8973],
 #                     -2.726785252069466, -0.9315032963941317, 2.962324195138054,
 #                     2.46586065658275] # start joint angles of the robot
 
-pandaStartJoints = [0.26190429284418065, -0.5810563287655276, 0.7782012656001908, -2.7792496275070055, 
-                    0.5334985709807144, 2.2695743643150834, 1.3797705354443341]
+# pandaStartJoints = [0.26190429284418065, -0.5810563287655276, 0.7782012656001908, -2.7792496275070055, 
+#                     0.5334985709807144, 2.2695743643150834, 1.3797705354443341]
+# pandaStartJoints = [0.08894933527790681, -0.2128840251071892, 1.0019243675345848, -2.848692213710732, 
+#                     0.4422292635478243, 2.6987754677312696, 1.4675497146911047]
+
+pandaStartJoints = [0.21655835653583172, -0.42891924384744967, 0.8711852676862311, -2.8238847559105715, 
+                    0.5453987903330254, 2.46692937619602, 1.38974135855112]
 
 SimTimeStep = 1./60. # the time step of the simulator
 
@@ -340,6 +345,10 @@ class PandaSim(object):
       self.restore_state(state_curr)
       return True
     for obs in self.obstacles:
+      for obj in self.objects:
+        if len(self.bullet_client.getContactPoints(obj, obs)) > 0:
+          self.restore_state(state_curr)
+          return True
       if len(self.bullet_client.getContactPoints(self.panda, obs)) > 0:
         self.restore_state(state_curr)
         return True
