@@ -154,7 +154,7 @@ def execute_plan(panda_sim, plan, sleep_time=0.005):
     p_from, _ = panda_sim.get_ee_pose()
     ctrl = node.get_control()
     if ctrl is not None:
-      _ = panda_sim.execute(ctrl, sleep_time=sleep_time)
+      ctrl.execute(panda_sim)
       p_to, _ = panda_sim.get_ee_pose()
       draw_line(panda_sim, p_from, p_to, c=[1, 0, 0], w=20)
 

@@ -87,17 +87,7 @@ class ControlSampler(object):
         self.low[3] = d
 
 
-class TwoStepControlSampler(object):
-    """
-    Performs an upward motion, then lands at a box and pushes it 
-    """
-    def __init__(self, pdef):
+class OOP_ControlSampler(object):
+    def __init__(self, pdef, epsilon=0.2):
         self.pdef = pdef
-        pass
-
-    def sample_to(self, nnode, rstateVec, k):
-        pass
-    
-    def sample_two_step(self):
-        # find a box 
-        return
+        self.eps = epsilon
