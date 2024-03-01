@@ -233,8 +233,12 @@ class PandaSim(object):
       wpts = np.vstack((wpts, wpt.reshape(1, -1)))
       time.sleep(sleep_time)
     return wpts, valid
-
-  def execute_lift(self, height, sleep_time = 0.0):
+  def execute_alt(self, x, y):
+    self.execute_lift(0.2)
+    air_ctrl = [x, y, 0, 1]
+    self.execute(air_ctrl)
+    self.execute_lift(-0.2)
+  def execute_lift(self, height = 0.2, sleep_time = 0.0):
     valid = True
     wpts = np.empty(shape=(0, 3))
     # d = ctrl[3] # duration
