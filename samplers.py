@@ -369,6 +369,9 @@ class Greedy_ControlSampler(object):
         nstate = nnode.state
         stateVec = nstate["stateVec"]
         box_pos_lst = np.zeros(shape=(self.n_boxes, 2))
+        box_weights = np.zeros(shape=(self.n_boxes))
+        ideal_pt = self.pdef.get_goal().optim_center
+        total_weight = 0
         for i in range(self.n_boxes):
             start_idx = -3*(i+1)
             end_idx = start_idx+2
@@ -376,11 +379,15 @@ class Greedy_ControlSampler(object):
             x_pos, y_pos = pos[0], pos[1]
             box_pos_lst[i, 0] = x_pos
             box_pos_lst[i, 1] = y_pos
-        weights = np.zeros(shape=(self.n_boxes, ))
+            box_weights[i] = np.linalg.norm(box_pos_lst[i] - ideal_pt)
+            total_weight += box_weights[i]
+        for j in range(self.n_boxes):
+            box_weights[j] = box_weights[j] / total_weight
+       
         
-        box_idx = np.random.randint(0, self.n_boxes)
+        box_idx = np.random.choice(range(0, self.n_boxes), p=box_weights)
         box_loc = box_pos_lst[box_idx]
-        ideal_pt = self.pdef.get_goal().optim_center
+        
 
         # Find behind the box 
         # slope of line with box and corner
