@@ -346,6 +346,8 @@ class Heuristic_dhRRT(object):
         self.h = h
         self.p = p
         self.d_max = d_max
+        self.greedy_count = 0
+        self.total = 0
         self.COLORS = [[1, 0, 0], # RED
                 [1, 0.5, 0], # LIGHT ORANGE
                 [1, 1, 0], # YELLOW 
@@ -398,7 +400,10 @@ class Heuristic_dhRRT(object):
         q_rand = self.state_sampler.sample()
         q_near = self.tree.nearest(q_rand)
 
-        near_control, near_state = self.control_sampler.sample_to(q_near, q_rand, k=m)
+        near_control, near_state, greedy = self.control_sampler.sample_to(q_near, q_rand, k=m)
+        if greedy:
+            self.greedy_count += 1
+        self.total += 1
         if not (near_control is None):
             new_node = Node(near_state)
             new_node.set_control(near_control)
@@ -451,7 +456,8 @@ class Heuristic_dhRRT(object):
         start_node.set_parent(None)
         self.tree.add(start_node)
         frontier_color = [1, 0, 0]
-        draw = True
+        exec_num = 0
+        draw_freq = 3
         tau = []
         t_s = time.time()
         deep_plan = []
@@ -467,12 +473,11 @@ class Heuristic_dhRRT(object):
                 print("Found motion")
                 utils.execute_plan(sim, tau, sleep_time=0.1)
                 print("Done with execution")
-                if draw:
+                if exec_num % draw_freq:
                     utils.draw_convex_frontier(sim, c=self.get_color())
+                    print("Controls chosen from samples :", self.total)
+                    print("Number of which are greedy :", self.greedy_count)
                     print("Done with drawing")
-                    draw = False
-                else:
-                    draw = True
                 frontier_color[1] += 0.2
                 # self.execute_tau(tau)
                 q_star = sim.save_state()

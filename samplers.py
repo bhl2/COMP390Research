@@ -511,9 +511,12 @@ class Greedy_ControlSampler(object):
         # nstate2, valid = self.pdef.propagate(nstate, ctrl1)
         # if not (valid and self.pdef.is_state_valid(nstate2, state_curr=nstate)):
         #     return None, None
+        greedys = []
+        greedy = False
         while (i < k):
             if np.random.rand() < (self.eps):
                 ctrl = self.get_greedy_span_action(nnode)
+                greedys.append(ctrl)
             else:
                 ctrl = control.NormalControl(np.random.uniform(self.low, self.high, self.dim))
             pstate, valid = self.pdef.propagate(nstate, ctrl)
@@ -528,4 +531,6 @@ class Greedy_ControlSampler(object):
         if len(dists) > 0:
             best_i = np.argmin(dists)
             bctrl, ostate = controls[best_i], pstates[best_i]
-        return bctrl, ostate
+        if bctrl in greedys:
+            greedy = True
+        return bctrl, ostate, greedy
