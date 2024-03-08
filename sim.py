@@ -75,7 +75,7 @@ class PandaSim(object):
 
     self.obstacles = []
     self.num_obstacles = 0
-    
+    self.n_boxes = 0
     self.jac_solver = jac.JacSolver() # The jacobian solver for the robot
     self.pdef = None # task-specific ProblemDefinition
 
@@ -90,6 +90,7 @@ class PandaSim(object):
                                              baseVisualShapeIndex=visBoxID,
                                              basePosition=[pos[0], pos[1], 0.02])
     self.bullet_client.changeDynamics(box, -1, lateralFriction=0.1)
+    self.n_boxes += 1
     return box
 
   def add_object(self, halfExtents, rgbaColor, pos):
@@ -361,3 +362,21 @@ class PandaSim(object):
         return True
     self.restore_state(state_curr)
     return False
+  
+  def is_in_box(self, state):
+    stateVec = state["stateVec"]
+    ee_pos, _ = self.get_ee_pose()
+    n = self.n_boxes
+    box_pos_lst = np.zeros(shape=(n, 2))
+    for i in range(n):
+      start_idx = -3*(i+1)
+      end_idx = start_idx+2
+      pos = stateVec[start_idx:end_idx]
+      # print("pos : ", pos)
+      box_pos_lst[i, 0] = pos[0]
+      box_pos_lst[i, 1] = pos[1]
+      if (abs(pos[0] - ee_pos[0]) < 0.02) and (abs(pos[1] - ee_pos[1]) < 0.02):
+        return True
+    return False
+    
+

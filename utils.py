@@ -139,6 +139,7 @@ def setup_390env(panda_sim, n_boxes=3):
   for pos in box_pos_lst:
     panda_sim.add_object([0.02, 0.02, 0.02], [0.0, 0.0, 1.0, 1.0], pos)
   
+  panda_sim.n_boxes = n_boxes
 
   return
 
@@ -157,6 +158,11 @@ def execute_plan(panda_sim, plan, sleep_time=0.05):
     ctrl = node.get_control()
     if ctrl is not None:
       valid = ctrl.execute(panda_sim, sleep_time=sleep_time)
+      in_box = panda_sim.is_in_box(panda_sim.save_state())
+      if in_box:
+        print("In a box :(")
+        panda_sim.restore_state(node.state)
+        return
       if not valid:
         print("Something went wrong with plan execution")
         panda_sim.restore_state(node.state)
@@ -238,6 +244,7 @@ def make_pair_dist_heuristic(g : PackGoal2):
   return h
 
 def draw_convex_frontier(panda_sim, n_boxes=3, c=[0, 1, 0], w=20):
+  n_boxes = panda_sim.n_boxes
   state = panda_sim.save_state()
   stateVec = state["stateVec"]
   box_pos_lst = np.zeros(shape=(n_boxes, 2))
