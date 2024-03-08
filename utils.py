@@ -151,6 +151,7 @@ def go_to_place(panda_sim, x, y):
   ctrl = [vx, vy, 0, 0.2]
   _ = panda_sim.execute(ctrl)
 def execute_plan(panda_sim, plan, sleep_time=0.05):
+  initial_state = plan[0].state
   for node in plan:
     panda_sim.restore_state(node.state)
     p_from, _ = panda_sim.get_ee_pose()
@@ -159,13 +160,13 @@ def execute_plan(panda_sim, plan, sleep_time=0.05):
     if ctrl is not None:
       valid = ctrl.execute(panda_sim, sleep_time=sleep_time)
       in_box = panda_sim.is_in_box(panda_sim.save_state())
-      if in_box:
-        print("In a box :(")
-        panda_sim.restore_state(node.state)
-        return
+      # if in_box:
+      #   print("In a box :(")
+      #   panda_sim.restore_state(initial_state)
+      #   return
       if not valid:
         print("Something went wrong with plan execution")
-        panda_sim.restore_state(node.state)
+        panda_sim.restore_state(initial_state)
         return
       p_to, _ = panda_sim.get_ee_pose()
       p_to[2] -= 0.1

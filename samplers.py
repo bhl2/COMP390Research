@@ -343,7 +343,28 @@ class Greedy_ControlSampler(object):
         self.low = self.pdef.bounds_ctrl.low # the lower bounds of the control space
         self.high = self.pdef.bounds_ctrl.high # the upper bounds of the control space
         self.n_boxes = pdef.get_goal().get_n_boxes()
-    
+    '''
+    Sample a lift
+    '''
+    def get_lift_action(self, nnode):
+        nstate = nnode.state
+        stateVec = nstate["stateVec"]
+        radius = 0.08
+        box_pos_lst = np.zeros(shape=(self.n_boxes, 2))
+        for i in range(self.n_boxes):
+            start_idx = -3*(i+1)
+            end_idx = start_idx+2
+            pos = stateVec[start_idx:end_idx]
+            x_pos, y_pos = pos[0], pos[1]
+            box_pos_lst[i, 0] = x_pos
+            box_pos_lst[i, 1] = y_pos
+        # pick a box
+        box_idx = np.random.randint(0, self.n_boxes)
+        box_loc = box_pos_lst[box_idx]
+        # pick an angle
+        angle = np.random.random() * np.pi * 2
+        final_x, final_y = box_loc[0] + radius * np.cos(angle), box_loc[1] + radius * np.sin(angle)
+        ctrl1 = control.LiftControl(final_x, final_y)
     def get_greedy_span_action(self, nnode):
         nstate = nnode.state
         stateVec = nstate["stateVec"]
@@ -377,9 +398,9 @@ class Greedy_ControlSampler(object):
         land_x = box_loc[0] - ideal_pt[0]
         land_y = box_loc[1] - ideal_pt[1]
         
-
-        land_vec = np.array([((land_x / (land_x + land_y)) * 0.08), 
-                        ((land_y / (land_x + land_y)) * 0.08)])
+        radius = 0.08 # how far away to land
+        land_vec = np.array([((land_x / (land_x + land_y)) * radius), 
+                        ((land_y / (land_x + land_y)) * radius)])
         weight1 = np.random.rand()
         weight2 = 1 - weight1
         angle = ((np.pi/4) * weight1) + ((-np.pi/4) * weight2)

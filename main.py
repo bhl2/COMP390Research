@@ -184,7 +184,7 @@ if __name__ == "__main__":
 
   # With Heuristic Sampling
   elif args.task == 9:
-    n_boxes = 4
+    n_boxes = 3
     utils.setup_390env(panda_sim, n_boxes=n_boxes)
     pdef = setup_pdef(panda_sim)
     goal = PackGoal2(n_boxes, 0.3, -1, 0.3, -1, 0.02)
