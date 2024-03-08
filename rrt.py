@@ -473,11 +473,12 @@ class Heuristic_dhRRT(object):
                 print("Found motion")
                 utils.execute_plan(sim, tau, sleep_time=0.1)
                 print("Done with execution")
-                if exec_num % draw_freq:
+                if exec_num % draw_freq == 0:
                     utils.draw_convex_frontier(sim, c=self.get_color())
                     print("Controls chosen from samples :", self.total)
                     print("Number of which are greedy :", self.greedy_count)
                     print("Done with drawing")
+                    exec_num += 1
                 frontier_color[1] += 0.2
                 # self.execute_tau(tau)
                 q_star = sim.save_state()
