@@ -2,7 +2,7 @@ import numpy as np
 import time
 import samplers
 import utils
-
+import control
 
 class Tree(object):
     """
@@ -78,7 +78,8 @@ class Node(object):
                                   "stateVec": numpy.ndarray}
         """
         self.state = state
-        self.control = np.zeros(shape=(4,)) # the control asscoiated with this node
+        #self.control = np.zeros(shape=(4,)) # the control asscoiated with this node
+        self.control = control.NormalControl(np.zeros(shape=(4, )))
         self.parent = None # the parent node of this node
     
     def compute_depth(self):
@@ -97,7 +98,7 @@ class Node(object):
     def get_parent(self):
         return self.parent
 
-    def set_control(self, control):
+    def set_control(self, control : control.Control):
         self.control = control
         # print(control)
 
@@ -302,6 +303,7 @@ class dhRRT(object):
                 deep_plan.append(tau)
                 #print("Found a tau: ", tau)
                 utils.execute_plan(sim, tau)
+                utils.draw_frontier(sim)
                 # self.execute_tau(tau)
                 q_star = sim.save_state()
                 if self.pdef.get_goal().is_satisfied(q_star):
@@ -311,6 +313,165 @@ class dhRRT(object):
                 new_start = Node(q_star)
                 new_start.set_parent(None)
                 new_start.set_control(np.zeros(shape=(4, )))
+                self.tree.add(new_start)
+                self.pdef.set_start_state(q_star)
+                tau = []
+                # q_star = None
+        if solved:
+            # flatten plan
+            for arr in deep_plan:
+                for element in arr:
+                    plan.append(element)
+        end = sim.save_state()
+        return solved, plan, end
+    
+class Heuristic_dhRRT(object):
+    """
+    From Ren 2022 Rearrangment:
+    
+    Inputs: start_state, the state we start in
+            g, the goal region (pdef.goal)
+            h, the heuristic function for evaluating closeness to goal
+            p, the progress threshold
+            d_max, the tree limit  
+    Output: Technically none, results in tau (sequence of controls) being executed
+    """
+    def __init__(self, pdef, h, p, d_max):
+        self.pdef = pdef
+        self.tree = Tree(pdef)
+        self.state_sampler = samplers.StateSampler(self.pdef) # state sampler
+        self.control_sampler = samplers.Greedy_ControlSampler(self.pdef) # control sampler
+        self.h = h
+        self.p = p
+        self.d_max = d_max
+        self.COLORS = [[1, 0, 0], # RED
+                [1, 0.5, 0], # LIGHT ORANGE
+                [1, 1, 0], # YELLOW 
+                [0.75, 1, 0.25], # YELLOW GREEN
+                [0, 1, 0], # GREEN
+                [0, 1, 1] # BLUE-GREEN
+                ]
+
+        self.color_idx = 0
+
+    def get_color(self):
+        color = self.COLORS[self.color_idx]
+        self.color_idx = (self.color_idx + 1) % len(self.COLORS)
+        return color
+    """
+    Gets the motions to achieve this node 
+    in other words, get all parents
+    """
+    def extract_controls(self, node : Node):
+        motions = [] # a list of parent nodes
+        curr_node = node
+        while curr_node != None:
+            motions.insert(0, curr_node)
+            curr_node = curr_node.get_parent()
+
+        return motions
+    
+    def execute_tau(self, tau):
+        
+        for motion in tau:
+            print(motion.get_control())
+            self.sim.execute(motion.get_control())
+        
+        print("Executed a tau")
+
+    """
+    Expands the current motion tree
+
+    Input: tree, current motion tree
+
+    Output: expanded tree
+    """
+    def expand_tree(self, tree):
+        # Hyperparams
+        m = 5
+
+        # sample random state
+        q_rand = self.state_sampler.sample()
+        q_near = self.tree.nearest(q_rand)
+
+        near_control, near_state = self.control_sampler.sample_to(q_near, q_rand, k=m)
+        if not (near_control is None):
+            new_node = Node(near_state)
+            new_node.set_control(near_control)
+            new_node.set_parent(q_near)
+            tree.add(new_node)
+        # ensure that v_star can be translated to a valid motion
+
+        return tree
+    
+    """
+    Input: tree, current motion tree
+
+    Inputs from class: h, heuristic fn
+                       p, progress threshold
+                       d_max, tree size limit
+    """
+    def evaluate_progress(self, tree : Tree):
+        q_new = self.tree.latest
+        tau = []
+        if self.pdef.goal.is_satisfied(q_new.get_state()):
+            tau = self.extract_controls(q_new)
+        elif (self.h(tree.nodes[0].get_state()) - self.h(q_new.get_state())) > self.p:
+            print("Acting based on progress")
+            tau = self.extract_controls(q_new)
+        elif (tree.depth() == self.d_max):
+            print("Max depth reached")
+            leaves = list(tree.get_leaves())
+            min_h = np.infty
+            min_leaf = None
+            for leaf in leaves:
+                curr_h = self.h(leaf.get_state())
+                if curr_h < min_h:
+                    print("Found a min leaf")
+                    min_h = curr_h
+                    min_leaf = leaf
+            tau = self.extract_controls(min_leaf)
+
+        
+        return tau
+    """
+    The dhRRT algorithm 
+    
+    Inputs: time_budget, self-explanatory
+    """
+    def solve(self, time_budget):
+        # Initialize Tree
+        start_node = Node(self.pdef.start_state)
+        sim = self.pdef.panda_sim
+        self.sim = sim
+        start_node.set_parent(None)
+        self.tree.add(start_node)
+        frontier_color = [1, 0, 0]
+        tau = []
+        t_s = time.time()
+        deep_plan = []
+        plan = []
+        solved = False
+        while ((time.time() - t_s) < time_budget):
+            self.tree = self.expand_tree(self.tree)
+            #print("Expanded tree")
+            tau = self.evaluate_progress(self.tree)
+            #print("Tau from latest evalutation: ", tau)
+            if (tau != []):
+                deep_plan.append(tau)
+                #print("Found a tau: ", tau)
+                utils.execute_plan(sim, tau, sleep_time=0.1)
+                utils.draw_convex_frontier(sim, c=self.get_color())
+                frontier_color[1] += 0.2
+                # self.execute_tau(tau)
+                q_star = sim.save_state()
+                if self.pdef.get_goal().is_satisfied(q_star):
+                    solved = True
+                    break
+                self.tree = Tree(self.pdef)
+                new_start = Node(q_star)
+                new_start.set_parent(None)
+                # new_start.set_control(np.zeros(shape=(4, )))
                 self.tree.add(new_start)
                 self.pdef.set_start_state(q_star)
                 tau = []

@@ -91,7 +91,7 @@ class ProblemDefinition(object):
     def set_control_bounds(self, bounds):
         self.bounds_ctrl = bounds
 
-    def is_state_valid(self, state):
+    def is_state_valid(self, state, state_curr=None):
         """
         Check if a state is valid or not.
         args: state: The query state of the system.
@@ -102,7 +102,7 @@ class ProblemDefinition(object):
         ########## TODO ##########
         if not (self.bounds_state.is_satisfied(state)):
             return False
-        if (self.panda_sim.is_collision(state)):
+        if (self.panda_sim.is_collision(state, state_curr=state_curr)):
             return False
         joint_vals = state["stateVec"][0:7]
         pos, _ = self.panda_sim.jac_solver.forward_kinematics(joint_vals)
@@ -141,6 +141,7 @@ class ProblemDefinition(object):
 
     def propagate(self, nstate, control):
         self.panda_sim.restore_state(nstate)
-        valid = self.panda_sim.execute(control)
+        # valid = self.panda_sim.execute(control)
+        valid = control.execute(self.panda_sim)
         state = self.panda_sim.save_state()
         return state, valid

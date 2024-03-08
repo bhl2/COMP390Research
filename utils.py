@@ -4,6 +4,7 @@ import pybullet as p
 import pybullet_data as pd
 import pybullet_utils.bullet_client as bc
 import sim
+import scipy
 from goal import PackGoal1, PackGoal2, find_packing
 '''
 Input: n, the number of boxes to generate
@@ -116,8 +117,8 @@ def setup_390env(panda_sim, n_boxes=3):
   bin_color = [0.4, 0.4, 0.4, 1.0]
 
   # smaller than [-0.3, 0.3] to ensure nothing starts in a corner
-  x_bound = [0, 0.25]
-  y_bound = [0, 0.25]
+  x_bound = [-0.2, 0.2]
+  y_bound = [-0.2, 0.2]
   # vertical walls
   panda_sim.add_obstacle([0.3, 0.01, 0.1], bin_color, [0, 0.31], baseMass=0)
   panda_sim.add_obstacle([0.3, 0.01, 0.1], bin_color, [0, -0.31], baseMass=0)
@@ -148,15 +149,17 @@ def go_to_place(panda_sim, x, y):
   vy = y - ee_y
   ctrl = [vx, vy, 0, 0.2]
   _ = panda_sim.execute(ctrl)
-def execute_plan(panda_sim, plan, sleep_time=0.005):
+def execute_plan(panda_sim, plan, sleep_time=0.05):
   for node in plan:
     panda_sim.restore_state(node.state)
     p_from, _ = panda_sim.get_ee_pose()
+    p_from[2] -= 0.1
     ctrl = node.get_control()
     if ctrl is not None:
-      ctrl.execute(panda_sim)
+      ctrl.execute(panda_sim, sleep_time=sleep_time)
       p_to, _ = panda_sim.get_ee_pose()
-      draw_line(panda_sim, p_from, p_to, c=[1, 0, 0], w=20)
+      p_to[2] -= 0.1
+      # draw_line(panda_sim, p_from, p_to, c=[1, 0, 0], w=20)
 
 def extract_reference_waypoints(panda_sim, ctrl):
   wpts_ref = np.empty(shape=(0, 3))
@@ -175,3 +178,87 @@ def extract_reference_waypoints(panda_sim, ctrl):
 
 def draw_line(panda_sim, p_from, p_to, c, w):
     return panda_sim.bullet_client.addUserDebugLine(p_from, p_to, lineColorRGB=c, lineWidth=w)
+
+def draw_frontier(panda_sim, n_boxes=3, c=[0, 1, 0], w=20):
+  state = panda_sim.save_state()
+  stateVec = state["stateVec"]
+  box_pos_lst = np.zeros(shape=(n_boxes, 2))
+  for i in range(n_boxes):
+    start_idx = -3*(i+1)
+    end_idx = start_idx+2
+    pos = stateVec[start_idx:end_idx]
+    box_pos_lst[i, 0] = pos[0]
+    box_pos_lst[i, 1] = pos[1]
+  sorted_list = sort_pairs(box_pos_lst)
+  for j in range(n_boxes-1):
+    loc1 = sorted_list[j]
+    pt_from = np.append(loc1, 0.05)
+    loc2 = sorted_list[j+1]
+    pt_to = np.append(loc2, 0.05)
+    draw_line(panda_sim=panda_sim, p_from=pt_from, p_to=pt_to, c=c, w=w)
+  print("Frontier Drawn")
+"""
+Given an array of pairs, sorts based on the first entry
+"""
+def sort_pairs(arr):
+  arrX = np.array(arr[:, 0])
+  arrY = np.array(arr[:, 1])
+
+  ind = np.argsort(arrX)
+  sortedX = arrX[ind]
+  sortedY = arrY[ind]
+  return np.stack((sortedX, sortedY), axis=-1)
+
+def make_pair_dist_heuristic(g : PackGoal2):
+  n = g.n_boxes
+  ideal = np.array(g.optim_packing)
+
+  def h(state):
+    stateVec = state["stateVec"]
+    
+    box_pos_lst = np.zeros(shape=(n, 2))
+    for i in range(n):
+      start_idx = -3*(i+1)
+      end_idx = start_idx+2
+      pos = stateVec[start_idx:end_idx]
+      box_pos_lst[i, 0] = pos[0]
+      box_pos_lst[i, 1] = pos[1]
+    box_pos_sorted = sort_pairs(box_pos_lst)
+    ideal_sorted = sort_pairs(ideal)
+    sum_dist = 0
+    for i in range(n):
+      dist = np.linalg.norm(box_pos_sorted[i] - ideal_sorted[i])
+      sum_dist += dist
+    return sum_dist
+  return h
+
+def draw_convex_frontier(panda_sim, n_boxes=3, c=[0, 1, 0], w=20):
+  state = panda_sim.save_state()
+  stateVec = state["stateVec"]
+  box_pos_lst = np.zeros(shape=(n_boxes, 2))
+  for i in range(n_boxes):
+    start_idx = -3*(i+1)
+    end_idx = start_idx+2
+    pos = stateVec[start_idx:end_idx]
+    box_pos_lst[i, 0] = pos[0]
+    box_pos_lst[i, 1] = pos[1]
+  # print("Dims :", box_pos_lst.shape)
+  with_corner = np.append(box_pos_lst, [[0.28, 0.28]], axis=0)
+  # print("List of points: ", with_corner)
+  # print("Dims :", with_corner.shape)
+  hull = scipy.spatial.ConvexHull(with_corner)
+  # print("Vertices :", hull.vertices[0])
+  for j in range(len(hull.vertices) - 1):
+    loc1 = with_corner[hull.vertices[j]]
+    pt_from = np.append(loc1, 0.03)
+    loc2 = with_corner[hull.vertices[j+1]]
+    pt_to = np.append(loc2, 0.03)
+    draw_line(panda_sim=panda_sim, p_from=pt_from, p_to=pt_to, c=c, w=w)
+
+  # Complete the polygon
+  loc1 = with_corner[hull.vertices[len(hull.vertices) - 1]]
+  pt_from = np.append(loc1, 0.03)
+  loc2 = with_corner[hull.vertices[0]]
+  pt_to = np.append(loc2, 0.03)
+  draw_line(panda_sim=panda_sim, p_from=pt_from, p_to=pt_to, c=c, w=w)
+

@@ -102,7 +102,8 @@ class PackGoal2(Goal):
             return True
         else:
             return False
-    
+    def get_n_boxes(self):
+        return self.n_boxes
     
 
 
