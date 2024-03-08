@@ -182,7 +182,7 @@ class PandaSim(object):
       self.bullet_client.applyExternalForce(box, -1, [0, 0, -0.98], [0, 0, 0], self.bullet_client.LINK_FRAME)
     self.bullet_client.stepSimulation()
 
-  def execute(self, ctrl, sleep_time=0.0):
+  def execute(self, ctrl, sleep_time=0.00):
     """
     Control the robot by Jacobian-based projection.
     args:       ctrl: The robot’s Cartesian velocity in 2D and its duration
@@ -207,7 +207,7 @@ class PandaSim(object):
       J = np.zeros(shape=(6, 7)) # Jacobian matrix
       vq = np.zeros(shape=(7,)) # joint velocities
       j_vals, _, _ = self.get_joint_states()
-      J = self.get_jacobian_matrix(j_vals)
+      J = self.get_jacobian_matrix_online()
       J_inv = np.linalg.pinv(J) # use pseudo inverse 
       vq = np.matmul(J_inv, vx)
       ##########################
@@ -222,7 +222,7 @@ class PandaSim(object):
                                                    targetVelocities=vq)
       self.step()
       # CHANGE: Used to be % 12 (0.2 sec), now % 3 (0.05 sec)
-      if (i + 1) % 3 == 0: # check for every 0.2 second
+      if (i + 1) % 2 == 0: # check for every 0.2 second
         if not self.pdef.is_state_valid(self.save_state()):
           valid = False
           break
@@ -233,8 +233,15 @@ class PandaSim(object):
       wpts = np.vstack((wpts, wpt.reshape(1, -1)))
       time.sleep(sleep_time)
     return wpts, valid
-
-  def execute_lift(self, height, sleep_time = 0.0):
+  def execute_alt(self, x, y, sleep_time=0):
+    _, _ = self.execute_lift(0.2, sleep_time=sleep_time)
+    ee_before, _ = self.get_ee_pose()
+    ee_x, ee_y = ee_before[0], ee_before[1]
+    air_ctrl = [x-ee_x, y-ee_y, 0, 1] # THIS IS ABSOLUTE, MAKE RELATIVE
+    _, _ = self.execute(air_ctrl, sleep_time=sleep_time)
+    _, valid = self.execute_lift(-0.2, sleep_time=sleep_time)
+    return _, valid 
+  def execute_lift(self, height = 0.2, sleep_time = 0.00):
     valid = True
     wpts = np.empty(shape=(0, 3))
     # d = ctrl[3] # duration
@@ -249,7 +256,7 @@ class PandaSim(object):
       J = np.zeros(shape=(6, 7)) # Jacobian matrix
       vq = np.zeros(shape=(7,)) # joint velocities
       j_vals, _, _ = self.get_joint_states()
-      J = self.get_jacobian_matrix(j_vals)
+      J = self.get_jacobian_matrix_online()
       J_inv = np.linalg.pinv(J) # use pseudo inverse 
       vq = np.matmul(J_inv, vx)
       ##########################
@@ -264,7 +271,7 @@ class PandaSim(object):
                                                    targetVelocities=vq)
       self.step()
       # CHANGE: Used to be % 12 (0.2 sec), now % 3 (0.05 sec)
-      if (i + 1) % 3 == 0: # check for every 0.2 second
+      if (i + 1) % 1 == 0: # check for every 0.2 second
         if not self.pdef.is_state_valid(self.save_state()):
           valid = False
           break
@@ -332,7 +339,7 @@ class PandaSim(object):
     J = np.vstack((Jt, Jr))
     return J
 
-  def is_collision(self, state):
+  def is_collision(self, state, state_curr=None):
     """
     Check if there is collision in the simulation when it is at "state".
     args: state: The state at which the collision is checked for the simulation.

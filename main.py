@@ -40,7 +40,7 @@ def setup_pdef(panda_sim):
 if __name__ == "__main__":
 
   parser = argparse.ArgumentParser()
-  parser.add_argument("--task", type=int, choices=[1, 2, 3, 4, 5, 6, 7])
+  parser.add_argument("--task", type=int, choices=[1, 2, 3, 4, 5, 6, 7, 8, 9])
   args = parser.parse_args()
 
   # set up the simulation
@@ -168,6 +168,35 @@ if __name__ == "__main__":
     # print("Should be last box:", state[-3:-1])
     # while ((time.time()-time_st) < 10):
     #   pass
+  elif args.task == 8:
+    utils.setup_390env(panda_sim)
+    pdef = setup_pdef(panda_sim)
+    goal = PackGoal2(3, 0.3, -1, 0.3, -1, 0.02)
+    pdef.set_goal(goal)
+    h = utils.make_center_heuristic(goal)
+    p_val = 0.03
+    d_max = 8
+    planner = rrt.OOP_dhRRT(pdef, h, p_val, d_max)
+    time_st = time.time()
+    solved, plan = planner.solve(1200.0)
+    print("Solved : ", solved)
+    pass
+
+  # With Heuristic Sampling
+  elif args.task == 9:
+    n_boxes = 4
+    utils.setup_390env(panda_sim, n_boxes=n_boxes)
+    pdef = setup_pdef(panda_sim)
+    goal = PackGoal2(n_boxes, 0.3, -1, 0.3, -1, 0.02)
+    pdef.set_goal(goal)
+    h = utils.make_pair_dist_heuristic(goal)
+    p_val = 0.01
+    d_max = 8
+    planner = rrt.Heuristic_dhRRT(pdef, h, p_val, d_max)
+    time_st = time.time()
+    solved, plan = planner.solve(1200.0)
+    print("Solved : ", solved)
+    pass
   else:
     # configure the simulation and the problem
     utils.setup_env(panda_sim)
