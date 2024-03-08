@@ -3,7 +3,7 @@ import time
 import samplers
 import utils
 import control
-
+import gc
 class Tree(object):
     """
     The tree class for Kinodynamic RRT.
@@ -306,6 +306,8 @@ class dhRRT(object):
                 utils.draw_frontier(sim)
                 # self.execute_tau(tau)
                 q_star = sim.save_state()
+                if not self.pdef.is_state_valid(q_star):
+                    print("Ended on a bad state")
                 if self.pdef.get_goal().is_satisfied(q_star):
                     solved = True
                     break
@@ -349,7 +351,9 @@ class Heuristic_dhRRT(object):
                 [1, 1, 0], # YELLOW 
                 [0.75, 1, 0.25], # YELLOW GREEN
                 [0, 1, 0], # GREEN
-                [0, 1, 1] # BLUE-GREEN
+                [0, 1, 1], # BLUE-GREEN
+                [0, 0, 1], # BLUE
+                [1, 0, 1] # PURPLE
                 ]
 
         self.color_idx = 0
@@ -447,6 +451,7 @@ class Heuristic_dhRRT(object):
         start_node.set_parent(None)
         self.tree.add(start_node)
         frontier_color = [1, 0, 0]
+        draw = True
         tau = []
         t_s = time.time()
         deep_plan = []
@@ -459,9 +464,15 @@ class Heuristic_dhRRT(object):
             #print("Tau from latest evalutation: ", tau)
             if (tau != []):
                 deep_plan.append(tau)
-                #print("Found a tau: ", tau)
+                print("Found motion")
                 utils.execute_plan(sim, tau, sleep_time=0.1)
-                utils.draw_convex_frontier(sim, c=self.get_color())
+                print("Done with execution")
+                if draw:
+                    utils.draw_convex_frontier(sim, c=self.get_color())
+                    print("Done with drawing")
+                    draw = False
+                else:
+                    draw = True
                 frontier_color[1] += 0.2
                 # self.execute_tau(tau)
                 q_star = sim.save_state()
@@ -474,6 +485,8 @@ class Heuristic_dhRRT(object):
                 # new_start.set_control(np.zeros(shape=(4, )))
                 self.tree.add(new_start)
                 self.pdef.set_start_state(q_star)
+                print("Tree and pdef reset")
+                gc.collect()
                 tau = []
                 # q_star = None
         if solved:

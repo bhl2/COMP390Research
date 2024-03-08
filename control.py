@@ -13,7 +13,7 @@ class LiftControl(Control):
         self.y = y
     
     def execute(self, sim, sleep_time=0.0):
-        valid = sim.execute_alt(self.x, self.y, sleep_time=sleep_time)
+        _ ,valid = sim.execute_alt(self.x, self.y, sleep_time=sleep_time)
         return valid 
 class NormalControl(Control):
     def __init__(self, ctrl):

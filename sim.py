@@ -240,7 +240,7 @@ class PandaSim(object):
     air_ctrl = [x-ee_x, y-ee_y, 0, 1] # THIS IS ABSOLUTE, MAKE RELATIVE
     _, _ = self.execute(air_ctrl, sleep_time=sleep_time)
     _, valid = self.execute_lift(-0.2, sleep_time=sleep_time)
-    return valid 
+    return _, valid 
   def execute_lift(self, height = 0.2, sleep_time = 0.00):
     valid = True
     wpts = np.empty(shape=(0, 3))

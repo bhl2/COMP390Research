@@ -84,7 +84,7 @@ class PackGoal2(Goal):
 
         # Compute best way to fit in corner
         self.optim_packing = find_packing(n_boxes, x_corner, x_dir, y_corner, y_dir, box_width)
-        self.optim_center = np.average(self.optim_packing, axis=0)
+        self.optim_center = np.array([x_corner - box_width, y_corner - box_width])
         self.n_boxes = n_boxes
     def is_satisfied(self, state):
         stateVec = state["stateVec"]

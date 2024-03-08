@@ -156,9 +156,14 @@ def execute_plan(panda_sim, plan, sleep_time=0.05):
     p_from[2] -= 0.1
     ctrl = node.get_control()
     if ctrl is not None:
-      ctrl.execute(panda_sim, sleep_time=sleep_time)
+      valid = ctrl.execute(panda_sim, sleep_time=sleep_time)
+      if not valid:
+        print("Something went wrong with plan execution")
+        panda_sim.restore_state(node.state)
+        return
       p_to, _ = panda_sim.get_ee_pose()
       p_to[2] -= 0.1
+  return
       # draw_line(panda_sim, p_from, p_to, c=[1, 0, 0], w=20)
 
 def extract_reference_waypoints(panda_sim, ctrl):
@@ -262,3 +267,14 @@ def draw_convex_frontier(panda_sim, n_boxes=3, c=[0, 1, 0], w=20):
   pt_to = np.append(loc2, 0.03)
   draw_line(panda_sim=panda_sim, p_from=pt_from, p_to=pt_to, c=c, w=w)
 
+'''
+Makes a 2x2 rotation matrix 
+'''
+def make_rot_mat(angle):
+  mat = np.zeros(shape=(2, 2))
+  mat[0, 0] = np.cos(angle)
+  mat[0, 1] = np.sin(angle)
+  mat[1, 0] = -np.sin(angle)
+  mat[1, 1] = np.cos(angle)
+
+  return mat

@@ -1,6 +1,7 @@
 import numpy as np
 import control
 import pybullet as bullet
+import utils
 class StateSampler(object):
     """
     The state sampler of Kinodynamic RRT.
@@ -335,7 +336,7 @@ A control sampler where eps % of the time it samples the greediest push possible
 
 """
 class Greedy_ControlSampler(object):
-    def __init__(self, pdef, epsilon=0.2):
+    def __init__(self, pdef, epsilon=0.4):
         self.pdef = pdef
         self.eps = epsilon
         self.dim = self.pdef.get_control_dimension() # dimensionality of the control space
@@ -343,6 +344,65 @@ class Greedy_ControlSampler(object):
         self.high = self.pdef.bounds_ctrl.high # the upper bounds of the control space
         self.n_boxes = pdef.get_goal().get_n_boxes()
     
+    def get_greedy_span_action(self, nnode):
+        nstate = nnode.state
+        stateVec = nstate["stateVec"]
+        box_pos_lst = np.zeros(shape=(self.n_boxes, 2))
+        for i in range(self.n_boxes):
+            start_idx = -3*(i+1)
+            end_idx = start_idx+2
+            pos = stateVec[start_idx:end_idx]
+            x_pos, y_pos = pos[0], pos[1]
+            box_pos_lst[i, 0] = x_pos
+            box_pos_lst[i, 1] = y_pos
+        weights = np.zeros(shape=(self.n_boxes, ))
+        
+        box_idx = np.random.randint(0, self.n_boxes)
+        box_loc = box_pos_lst[box_idx]
+        ideal_pt = self.pdef.get_goal().optim_center
+
+        # Find behind the box 
+        # slope of line with box and corner
+        y_delt = (ideal_pt[1] - box_loc[1])
+        x_delt = (ideal_pt[0] - box_loc[0]) 
+
+        pos, quat = self.pdef.panda_sim.get_ee_pose()
+        euler = bullet.getEulerFromQuaternion(quat)
+        yaw = euler[2]
+        dot = np.dot(pos[0:2], [0.3, 0.3])
+        norm1 = np.linalg.norm(pos[0:2])
+        norm2 = np.linalg.norm([0.3, 0.3])
+        val = dot / (norm1 * norm2)
+        diff_angle = np.arccos(val) # use to turn EEF 
+        land_x = box_loc[0] - ideal_pt[0]
+        land_y = box_loc[1] - ideal_pt[1]
+        
+
+        land_vec = np.array([((land_x / (land_x + land_y)) * 0.08), 
+                        ((land_y / (land_x + land_y)) * 0.08)])
+        weight1 = np.random.rand()
+        weight2 = 1 - weight1
+        angle = ((np.pi/4) * weight1) + ((-np.pi/4) * weight2)
+
+        rot_mat = utils.make_rot_mat(angle)
+        # print("Rot mat :", rot_mat)
+
+        final_land = np.matmul(rot_mat, land_vec)
+
+        
+
+        acc_land_x = box_loc[0] - final_land[0]
+        acc_land_y = box_loc[1] - final_land[1]
+
+        dir = np.array([x_delt, y_delt])
+        final_dir = np.matmul(rot_mat, dir)
+
+
+        c1 = control.LiftControl(acc_land_x, acc_land_y)
+        c2 = control.NormalControl([0, 0, diff_angle, 1])
+        c15 = control.CompoundControl(c1, c2)
+        c3 = control.NormalControl([0.7 * final_dir[0], 0.7 * final_dir[1], 0, 0.75])
+        return control.CompoundControl(c15, c3)
     def get_greedy_action(self, nnode):
         nstate = nnode.state
         stateVec = nstate["stateVec"]
@@ -354,6 +414,7 @@ class Greedy_ControlSampler(object):
             x_pos, y_pos = pos[0], pos[1]
             box_pos_lst[i, 0] = x_pos
             box_pos_lst[i, 1] = y_pos
+        weights = np.zeros(shape=(self.n_boxes, ))
         
         box_idx = np.random.randint(0, self.n_boxes)
         box_loc = box_pos_lst[box_idx]
@@ -380,7 +441,7 @@ class Greedy_ControlSampler(object):
         c1 = control.LiftControl(acc_land_x, acc_land_y)
         c2 = control.NormalControl([0, 0, diff_angle, 1])
         c15 = control.CompoundControl(c1, c2)
-        c3 = control.NormalControl([0.5 * x_delt, 0.5 * y_delt, 0, 0.5])
+        c3 = control.NormalControl([0.7 * x_delt, 0.7 * y_delt, 0, 1])
         return control.CompoundControl(c15, c3)
         pass
     
@@ -409,24 +470,26 @@ class Greedy_ControlSampler(object):
         dists = []
         i = 0
         # is this a lift control or no?
-        if np.random.rand() < (self.eps):
-            ctrl1 = self.get_greedy_action(nnode)
-            ostate, valid = self.pdef.propagate(nstate, ctrl1)
-            if valid:
-                return ctrl1, ostate
-            else: 
-                ctrl1 = control.NormalControl(np.zeros(shape=(4,)))
-        else:
-            ctrl1 = control.NormalControl(np.zeros(shape=(4,)))
+        # if np.random.rand() < (self.eps):
+        #     ctrl1 = self.get_greedy_action(nnode)
+        #     ostate, valid = self.pdef.propagate(nstate, ctrl1)
+        #     if valid:
+        #         return ctrl1, ostate
+        #     else: 
+        #         ctrl1 = control.NormalControl(np.zeros(shape=(4,)))
+        # else:
+        #     ctrl1 = control.NormalControl(np.zeros(shape=(4,)))
 
-        nstate2, valid = self.pdef.propagate(nstate, ctrl1)
-        if not (valid and self.pdef.is_state_valid(nstate2, state_curr=nstate)):
-            return None, None
+        # nstate2, valid = self.pdef.propagate(nstate, ctrl1)
+        # if not (valid and self.pdef.is_state_valid(nstate2, state_curr=nstate)):
+        #     return None, None
         while (i < k):
-
-            ctrl = control.CompoundControl(ctrl1, control.NormalControl(np.random.uniform(self.low, self.high, self.dim)))
-            pstate, valid = self.pdef.propagate(nstate2, ctrl)
-            if valid and self.pdef.is_state_valid(pstate, state_curr = nstate2):
+            if np.random.rand() < (self.eps):
+                ctrl = self.get_greedy_span_action(nnode)
+            else:
+                ctrl = control.NormalControl(np.random.uniform(self.low, self.high, self.dim))
+            pstate, valid = self.pdef.propagate(nstate, ctrl)
+            if valid and self.pdef.is_state_valid(pstate):
                 dist = self.pdef.distance_func(pstate["stateVec"], rstateVec)
                 controls.append(ctrl)
                 pstates.append(pstate)
