@@ -40,7 +40,7 @@ def setup_pdef(panda_sim):
 if __name__ == "__main__":
 
   parser = argparse.ArgumentParser()
-  parser.add_argument("--task", type=int, choices=[1, 2, 3, 4, 5, 6, 7, 8, 9])
+  parser.add_argument("--task", type=int, choices=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
   args = parser.parse_args()
 
   # set up the simulation
@@ -197,6 +197,43 @@ if __name__ == "__main__":
     solved, plan = planner.solve(1200.0)
     print("Solved : ", solved)
     pass
+  elif args.task == 10:
+    # this function does all the magic
+    # it accepts any function you want to speed test
+    # then it performs the test, analyses the results, and provides the output in your browser
+    def speedtest(function_wrapper):
+        import cProfile
+        import pstats
+        import snakeviz.cli as cli
+
+        with cProfile.Profile() as pr:
+            function_wrapper()
+        stats = pstats.Stats(pr)
+        stats.sort_stats(pstats.SortKey.TIME)
+        filename = "speedtest_profile.prof"
+        stats.dump_stats(filename=filename)
+        cli.main([filename])
+
+
+    # simply place the code you want to speed test inside a wrapper function
+    # it can be called anything but wrapper is used here
+    def wrapper():
+      n_boxes = 3
+      utils.setup_390env(panda_sim, n_boxes=n_boxes)
+      pdef = setup_pdef(panda_sim)
+      goal = PackGoal2(n_boxes, 0.3, -1, 0.3, -1, 0.02)
+      pdef.set_goal(goal)
+      h = utils.make_pair_dist_heuristic(goal)
+      p_val = 0.01
+      d_max = 8
+      planner = rrt.Heuristic_dhRRT(pdef, h, p_val, d_max)
+      time_st = time.time()
+      solved, plan, end = planner.solve(300.0)
+      print("Solved : ", solved)
+
+
+    # this executes the speedtest on the wrapper function
+    speedtest(wrapper)
   else:
     # configure the simulation and the problem
     utils.setup_env(panda_sim)

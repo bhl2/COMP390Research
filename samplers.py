@@ -2,6 +2,16 @@ import numpy as np
 import control
 import pybullet as bullet
 import utils
+import math
+import scipy
+
+def compute_centroid(list, facets):
+    div = len(facets)
+    avg = np.zeros(shape=(2, ))
+    for fac in facets:
+        avg += list[fac] / div
+    
+    return avg
 class StateSampler(object):
     """
     The state sampler of Kinodynamic RRT.
@@ -218,7 +228,6 @@ class OOP_ControlSampler(object):
             final_x, final_y = box_loc[0] + radius * np.cos(angle), box_loc[1] + radius * np.sin(angle)
             ctrl1 = control.LiftControl(final_x, final_y)
             return ctrl1
-            pstate, valid = self.pdef.propagate(nstate, ctrl1)
             # print("-------AFTER LIFT ----------")
             # print(pstate)
             # print("----------------------")
@@ -336,7 +345,7 @@ A control sampler where eps % of the time it samples the greediest push possible
 
 """
 class Greedy_ControlSampler(object):
-    def __init__(self, pdef, epsilon=0.4):
+    def __init__(self, pdef, epsilon=0.2):
         self.pdef = pdef
         self.eps = epsilon
         self.dim = self.pdef.get_control_dimension() # dimensionality of the control space
@@ -365,6 +374,45 @@ class Greedy_ControlSampler(object):
         angle = np.random.random() * np.pi * 2
         final_x, final_y = box_loc[0] + radius * np.cos(angle), box_loc[1] + radius * np.sin(angle)
         ctrl1 = control.LiftControl(final_x, final_y)
+
+    """
+    
+    Use (f(x+h)-f(x)) / h 
+    """
+    def compute_local_gradient(self, box_idx, box_pos_lst):
+        h = 1 ** -10
+        ideal_pt = self.pdef.get_goal().optim_center
+
+        grads = []
+        # COMPUTE HULL
+        hull = scipy.spatial.ConvexHull(box_pos_lst)
+        
+        # GET FACET IDXs
+        facets = hull.vertices
+        centroid = compute_centroid(box_pos_lst, facets)
+        # FOR EACH FACET, COMPUTE GRADIENT
+
+        # COMPUTE f(x) first tho
+        centroid_dist = np.linalg.norm(centroid-ideal_pt)
+        # GRADIENT = CHANGE IN DISTANCE FROM CENTROID TO CORNER
+        for facetIdx in facets:
+            coord = box_pos_lst[facetIdx]
+            dist = coord - ideal_pt
+            mag = np.linalg.norm(dist)
+            norm_dist = dist / mag
+
+            new_coord = coord -(norm_dist * h)
+            box_pos_copy = np.copy(box_pos_lst)
+            box_pos_copy[facetIdx] = new_coord
+            new_hull = scipy.spatial.ConvexHull(box_pos_copy)
+            new_facets = new_hull.vertices
+            new_centroid = compute_centroid(box_pos_copy, new_facets)
+            new_dist = np.linalg.norm(new_centroid - ideal_pt)
+
+            grad = (new_dist - centroid_dist) / h
+            grads.append(grad)
+        # RETURN GRADIENTS
+        return np.array(grads)
     def get_greedy_span_action(self, nnode):
         nstate = nnode.state
         stateVec = nstate["stateVec"]
@@ -379,10 +427,13 @@ class Greedy_ControlSampler(object):
             x_pos, y_pos = pos[0], pos[1]
             box_pos_lst[i, 0] = x_pos
             box_pos_lst[i, 1] = y_pos
-            box_weights[i] = np.linalg.norm(box_pos_lst[i] - ideal_pt)
+            box_weights[i] = (np.linalg.norm(box_pos_lst[i] - ideal_pt))
             total_weight += box_weights[i]
         for j in range(self.n_boxes):
             box_weights[j] = box_weights[j] / total_weight
+        
+        print("Sum of weights", np.sum(box_weights))
+        print("Weights :", box_weights)
        
         
         box_idx = np.random.choice(range(0, self.n_boxes), p=box_weights)

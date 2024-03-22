@@ -76,6 +76,7 @@ class PandaSim(object):
     self.obstacles = []
     self.num_obstacles = 0
     self.n_boxes = 0
+    self.boxes = []
     self.jac_solver = jac.JacSolver() # The jacobian solver for the robot
     self.pdef = None # task-specific ProblemDefinition
 
@@ -91,6 +92,7 @@ class PandaSim(object):
                                              basePosition=[pos[0], pos[1], 0.02])
     self.bullet_client.changeDynamics(box, -1, lateralFriction=0.1)
     self.n_boxes += 1
+    self.boxes.append(box)
     return box
 
   def add_object(self, halfExtents, rgbaColor, pos):
@@ -183,7 +185,7 @@ class PandaSim(object):
       self.bullet_client.applyExternalForce(box, -1, [0, 0, -0.98], [0, 0, 0], self.bullet_client.LINK_FRAME)
     self.bullet_client.stepSimulation()
 
-  def execute(self, ctrl, sleep_time=0.00):
+  def execute(self, ctrl, sleep_time=0.00, check_freq=2):
     """
     Control the robot by Jacobian-based projection.
     args:       ctrl: The robot’s Cartesian velocity in 2D and its duration
@@ -223,7 +225,7 @@ class PandaSim(object):
                                                    targetVelocities=vq)
       self.step()
       # CHANGE: Used to be % 12 (0.2 sec), now % 3 (0.05 sec)
-      if (i + 1) % 2 == 0: # check for every 0.2 second
+      if (i + 1) % check_freq == 0: # check for every 0.2 second
         if not self.pdef.is_state_valid(self.save_state()):
           valid = False
           break
@@ -232,14 +234,14 @@ class PandaSim(object):
       euler_ee = self.bullet_client.getEulerFromQuaternion(quat_ee)
       wpt = np.array([pos_ee[0], pos_ee[1], euler_ee[2] % (2 * np.pi)])
       wpts = np.vstack((wpts, wpt.reshape(1, -1)))
-      time.sleep(sleep_time)
+      #time.sleep(sleep_time)
     return wpts, valid
-  def execute_alt(self, x, y, sleep_time=0):
+  def execute_alt(self, x, y, sleep_time=0.0):
     _, _ = self.execute_lift(0.2, sleep_time=sleep_time)
     ee_before, _ = self.get_ee_pose()
     ee_x, ee_y = ee_before[0], ee_before[1]
     air_ctrl = [x-ee_x, y-ee_y, 0, 1] # THIS IS ABSOLUTE, MAKE RELATIVE
-    _, _ = self.execute(air_ctrl, sleep_time=sleep_time)
+    _, _ = self.execute(air_ctrl, sleep_time=sleep_time, check_freq=60)
     _, valid = self.execute_lift(-0.2, sleep_time=sleep_time)
     return _, valid 
   def execute_lift(self, height = 0.2, sleep_time = 0.00):
@@ -272,7 +274,7 @@ class PandaSim(object):
                                                    targetVelocities=vq)
       self.step()
       # CHANGE: Used to be % 12 (0.2 sec), now % 3 (0.05 sec)
-      if (i + 1) % 1 == 0: # check for every 0.2 second
+      if (i + 1) % 60 == 0: # check for every 0.2 second
         if not self.pdef.is_state_valid(self.save_state()):
           valid = False
           break
@@ -281,7 +283,7 @@ class PandaSim(object):
       euler_ee = self.bullet_client.getEulerFromQuaternion(quat_ee)
       wpt = np.array([pos_ee[0], pos_ee[1], euler_ee[2] % (2 * np.pi)])
       wpts = np.vstack((wpts, wpt.reshape(1, -1)))
-      time.sleep(sleep_time)
+      #time.sleep(sleep_time)
     return wpts, valid
   
   def get_joint_states(self):
@@ -347,20 +349,20 @@ class PandaSim(object):
                  Type: dict, {"stateID": int, "stateVec": numpy.ndarray}
     returns: True of False.
     """
-    state_curr = self.save_state()
+    # state_curr = self.save_state()
     self.restore_state(state)
     if len(self.bullet_client.getContactPoints(self.panda, self.plane)) > 0:
-      self.restore_state(state_curr)
+      # self.restore_state(state_curr)
       return True
     for obs in self.obstacles:
       for obj in self.objects:
         if len(self.bullet_client.getContactPoints(obj, obs)) > 0:
-          self.restore_state(state_curr)
+          # self.restore_state(state_curr)
           return True
       if len(self.bullet_client.getContactPoints(self.panda, obs)) > 0:
-        self.restore_state(state_curr)
+        # self.restore_state(state_curr)
         return True
-    self.restore_state(state_curr)
+    # self.restore_state(state_curr)
     return False
   
   def is_in_box(self, state):

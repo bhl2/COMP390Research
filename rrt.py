@@ -342,7 +342,7 @@ class Heuristic_dhRRT(object):
         self.pdef = pdef
         self.tree = Tree(pdef)
         self.state_sampler = samplers.StateSampler(self.pdef) # state sampler
-        self.control_sampler = samplers.Greedy_ControlSampler(self.pdef) # control sampler
+        self.control_sampler = samplers.Greedy_ControlSampler(self.pdef, epsilon=0.4) # control sampler
         self.h = h
         self.p = p
         self.d_max = d_max
@@ -478,7 +478,7 @@ class Heuristic_dhRRT(object):
                     print("Controls chosen from samples :", self.total)
                     print("Number of which are greedy :", self.greedy_count)
                     print("Done with drawing")
-                    exec_num += 1
+                exec_num += 1
                 frontier_color[1] += 0.2
                 # self.execute_tau(tau)
                 q_star = sim.save_state()
@@ -501,5 +501,6 @@ class Heuristic_dhRRT(object):
                 for element in arr:
                     plan.append(element)
         end = sim.save_state()
+        print("Returning")
         return solved, plan, end
     
