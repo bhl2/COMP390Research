@@ -32,7 +32,7 @@ def setup_pdef(panda_sim):
   bounds_ctrl.set_bounds(0, -0.2, 0.2)
   bounds_ctrl.set_bounds(1, -0.2, 0.2)
   bounds_ctrl.set_bounds(2, -1.0, 1.0)
-  bounds_ctrl.set_bounds(3, 0.4, 0.6)
+  bounds_ctrl.set_bounds(3, 0.4, 0.8)
   pdef.set_control_bounds(bounds_ctrl)
   return pdef
 
